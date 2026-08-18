@@ -1,0 +1,10 @@
+============================================================
+                   PC Doctor Portable
+          Windows Maintenance & Repair Tool
+
+                      Version 1.2
+
+               Developed by Babulal Rojh
+
+        Copyright (c) 2026 Code Knot Technology
+============================================================

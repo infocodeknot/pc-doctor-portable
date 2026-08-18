@@ -1,0 +1,88 @@
+{
+    "General": {
+
+        "ToolkitName": "PC Doctor Portable",
+        "Version": "1.2",
+        "Language": "EN",
+        "ShowToast": true,
+        "ConsoleStyle": "Classic",
+        "Theme": "System",
+        "UpdateUrl": "https://api.github.com/repos/infocodeknot/pc-doctor-portable/releases/latest",
+
+        "AutoMode": true,
+        "InteractiveMode": false
+
+    },
+
+    "RestorePoint": {
+
+        "Enabled": true
+
+    },
+
+    "Cleanup": {
+
+        "CleanTemp": true,
+        "RunDiskCleanup": true,
+        "CleanCookies": true,
+        "CleanBrowserCache": true,
+        "CleanPrefetch": true,
+        "CleanCrashDumps": true,
+        "CleanWindowsUpdateCache": false
+
+    },
+
+    "Optimization": {
+
+        "OptimizeDrives": true,
+        "RestartExplorer": true,
+        "ClearThumbnailCache": true
+
+    },
+
+    "WindowsUpdate": {
+
+        "Enabled": true
+
+    },
+
+    "Drivers": {
+
+        "Enabled": true
+
+    },
+
+    "Winget": {
+
+        "Enabled": true
+
+    },
+
+    "Store": {
+
+        "Enabled": true
+
+    },
+
+    "Repair": {
+
+        "RunDISM": true,
+        "RunSFC": true
+
+    },
+
+    "Restart": {
+
+        "AutoRestart": false
+
+    },
+
+    "Retention": {
+
+        "KeepLogs": 30,
+        "KeepReports": 20,
+        "KeepBackups": 5
+
+    }
+
+}
