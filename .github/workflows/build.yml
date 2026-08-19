@@ -1,16 +1,28 @@
 # ==========================================================
-# PC Doctor Portable - CI build
+# PC Doctor Portable - CI / Release Build
 #
-# On every v* tag push (and manual dispatch):
-#   1. Runs the Pester test suite + syntax checks
-#   2. Builds Installer\Output\PCDoctorPortable-Setup-<ver>.exe
-#   3. Attaches the Setup.exe to the GitHub Release for that
-#      tag - which is exactly what the in-app update check
-#      downloads ("Download now" button).
+# Workflow file:
+# .github/workflows/build.yml
 #
-# The update check in Config.json points at
-# https://api.github.com/repos/codeknot/pc-doctor-portable/
-# releases/latest - change Config.json if the repo moves.
+# On every v* tag push:
+#   1. Runs GUI self-test
+#   2. Checks all PowerShell scripts for syntax errors
+#   3. Generates app icon if required
+#   4. Installs / locates Inno Setup
+#   5. Builds:
+#        Installer/Output/PCDoctorPortable-Setup-<ver>.exe
+#   6. Optionally code-signs the installer
+#   7. Uploads installer as a GitHub Actions artifact
+#   8. Attaches installer to the GitHub Release for that tag
+#
+# Manual workflow_dispatch:
+#   Runs the build/tests but does NOT create a Release,
+#   because there is no v* tag.
+#
+# The in-app update check uses:
+# https://api.github.com/repos/infocodeknot/pc-doctor-portable/releases/latest
+#
+# If the repository moves, update Config.json accordingly.
 # ==========================================================
 
 name: Build installer
@@ -19,6 +31,7 @@ on:
   push:
     tags:
       - "v*"
+
   workflow_dispatch:
 
 permissions:
@@ -27,51 +40,283 @@ permissions:
 jobs:
   test-and-build:
     runs-on: windows-latest
+
+    env:
+      PFX_BASE64: ${{ secrets.PFX_BASE64 }}
+      PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
+
     steps:
+
+      # ------------------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      # ------------------------------------------------------
+      # 2. Install and configure Inno Setup
+      # ------------------------------------------------------
       - name: Set up Inno Setup
         shell: pwsh
         run: |
-          winget install --id JRSoftware.InnoSetup -e --silent --accept-package-agreements --accept-source-agreements
-          $paths = @("C:\Program Files (x86)\Inno Setup 6", "C:\Program Files\Inno Setup 6")
-          foreach ($path in $paths) {
-            if (Test-Path $path) {
-              echo "$path" >> $env:GITHUB_PATH
-              $env:PATH += ";$path"
-            }
+          $ErrorActionPreference = "Stop"
+
+          Write-Host "Installing Inno Setup..."
+
+          winget install `
+            --id JRSoftware.InnoSetup `
+            -e `
+            --silent `
+            --accept-package-agreements `
+            --accept-source-agreements
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "winget failed to install Inno Setup. Exit code: $LASTEXITCODE"
           }
-                   
+
+          Write-Host ""
+          Write-Host "Searching for ISCC.exe..."
+
+          $Candidates = @(
+              "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+              "C:\Program Files\Inno Setup 6\ISCC.exe"
+          )
+
+          $ISCC = $null
+
+          foreach ($Candidate in $Candidates) {
+              if (Test-Path $Candidate) {
+                  $ISCC = $Candidate
+                  break
+              }
+          }
+
+          # Fallback search in case Inno Setup is installed
+          # somewhere else.
+          if (-not $ISCC) {
+              $ISCC = Get-ChildItem `
+                  -Path "C:\Program Files", "C:\Program Files (x86)" `
+                  -Filter "ISCC.exe" `
+                  -File `
+                  -Recurse `
+                  -ErrorAction SilentlyContinue |
+                  Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if (-not $ISCC) {
+              Write-Host ""
+              Write-Host "ERROR: Inno Setup was installed but ISCC.exe was not found."
+              Write-Host ""
+
+              Write-Host "Possible Inno Setup directories:"
+
+              Get-ChildItem `
+                  "C:\Program Files (x86)" `
+                  -Directory `
+                  -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -like "*Inno*" } |
+                  Select-Object FullName
+
+              Get-ChildItem `
+                  "C:\Program Files" `
+                  -Directory `
+                  -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -like "*Inno*" } |
+                  Select-Object FullName
+
+              throw "Inno Setup / ISCC.exe could not be located."
+          }
+
+          $InnoDir = Split-Path $ISCC -Parent
+
+          Write-Host ""
+          Write-Host "Inno Setup found:"
+          Write-Host $ISCC
+
+          # Make Inno Setup available to ALL following steps.
+          $InnoDir | Out-File `
+              -FilePath $env:GITHUB_PATH `
+              -Encoding utf8 `
+              -Append
+
+          # Also make it available in the current step.
+          $env:PATH += ";$InnoDir"
+
+          Write-Host ""
+          Write-Host "Testing ISCC.exe..."
+
+          & $ISCC /?
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "ISCC.exe was found but could not be executed."
+          }
+
+          Write-Host ""
+          Write-Host "Inno Setup configured successfully."
+
+
+      # ------------------------------------------------------
+      # 3. GUI self-test
+      # ------------------------------------------------------
       - name: GUI self-test (Windows PowerShell)
         shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File App/PCDoctor-GUI.ps1 -SelfTest
+        run: |
+          powershell `
+            -NoProfile `
+            -ExecutionPolicy Bypass `
+            -File App/PCDoctor-GUI.ps1 `
+            -SelfTest
 
+
+      # ------------------------------------------------------
+      # 4. Parse all PowerShell scripts
+      # ------------------------------------------------------
       - name: Parse all PowerShell scripts
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $Files = Get-ChildItem -Recurse -Filter *.ps1
-          foreach ($F in $Files)
-          {
+
+          $Files = Get-ChildItem `
+              -Recurse `
+              -Filter *.ps1 `
+              -File
+
+          if ($Files.Count -eq 0) {
+              throw "No PowerShell scripts were found."
+          }
+
+          foreach ($F in $Files) {
+
+              Write-Host "Checking: $($F.FullName)"
+
               $Errors = $null
+
               [System.Management.Automation.Language.Parser]::ParseFile(
-                  $F.FullName, [ref]$null, [ref]$Errors) | Out-Null
-              if ($Errors.Count -gt 0)
-              {
+                  $F.FullName,
+                  [ref]$null,
+                  [ref]$Errors
+              ) | Out-Null
+
+              if ($Errors -and $Errors.Count -gt 0) {
                   throw "$($F.Name): $($Errors[0].Message)"
               }
           }
-          Write-Host "Parsed $($Files.Count) scripts OK"
 
+          Write-Host ""
+          Write-Host "Parsed $($Files.Count) PowerShell scripts successfully."
+
+
+      # ------------------------------------------------------
+      # 5. Generate application icon if missing
+      # ------------------------------------------------------
       - name: Generate app icon (if missing)
         shell: pwsh
-        run: pwsh -File Tools/New-AppIcon.ps1
+        run: |
+          pwsh -File Tools/New-AppIcon.ps1
 
+          if ($LASTEXITCODE -ne 0) {
+              throw "New-AppIcon.ps1 failed with exit code $LASTEXITCODE."
+          }
+
+
+      # ------------------------------------------------------
+      # 6. Build installer
+      # ------------------------------------------------------
       - name: Build installer
         shell: pwsh
-        run: pwsh -File Tools/Build-Installer.ps1 -SkipIcon
+        run: |
+          $ErrorActionPreference = "Stop"
 
+          pwsh -File Tools/Build-Installer.ps1 -SkipIcon
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "Build-Installer.ps1 failed with exit code $LASTEXITCODE."
+          }
+
+
+      # ------------------------------------------------------
+      # 7. Verify installer output
+      # ------------------------------------------------------
+      - name: Verify installer output
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $Installers = Get-ChildItem `
+              -Path "Installer/Output" `
+              -Filter "*.exe" `
+              -File `
+              -ErrorAction SilentlyContinue
+
+          if (-not $Installers) {
+              throw "No installer EXE was found in Installer/Output."
+          }
+
+          Write-Host ""
+          Write-Host "Installer(s) found:"
+
+          foreach ($Installer in $Installers) {
+              Write-Host " - $($Installer.FullName)"
+          }
+
+
+      # ------------------------------------------------------
+      # 8. Optional code signing
+      #
+      # GitHub Secrets:
+      #
+      # PFX_BASE64
+      # PFX_PASSWORD
+      #
+      # If both are configured, installer is signed.
+      # Otherwise signing is skipped.
+      # ------------------------------------------------------
+      - name: Sign installer
+        if: ${{ env.PFX_BASE64 != '' && env.PFX_PASSWORD != '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          Write-Host "Code-signing secrets detected."
+
+          $Bytes = [Convert]::FromBase64String($env:PFX_BASE64)
+
+          $Pfx = Join-Path `
+              $env:RUNNER_TEMP `
+              "pc-doctor-signing-cert.pfx"
+
+          [IO.File]::WriteAllBytes($Pfx, $Bytes)
+
+          try {
+
+              pwsh -File `
+                  Tools/Sign-Installer.ps1 `
+                  -PfxPath $Pfx `
+                  -PfxPassword $env:PFX_PASSWORD
+
+              if ($LASTEXITCODE -ne 0) {
+                  throw "Sign-Installer.ps1 failed with exit code $LASTEXITCODE."
+              }
+
+          }
+          finally {
+
+              # Remove temporary certificate from runner.
+              if (Test-Path $Pfx) {
+                  Remove-Item $Pfx -Force
+              }
+          }
+
+          Write-Host "Code signing completed."
+
+
+      # ------------------------------------------------------
+      # 9. Upload final installer artifact
+      #
+      # This is AFTER signing, so the uploaded artifact is
+      # the same final installer that gets published.
+      # ------------------------------------------------------
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -79,23 +324,12 @@ jobs:
           path: Installer/Output/*.exe
           if-no-files-found: error
 
-      # Optional code signing: store the PFX as a base64 secret
-      # (PFX_BASE64) and the password as PFX_PASSWORD. Without a
-      # public-CA certificate SmartScreen will warn - see README.
-      - name: Sign installer
-        if: env.PFX_BASE64 != ''
-        shell: pwsh
-        env:
-          PFX_BASE64: ${{ secrets.PFX_BASE64 }}
-          PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
-        run: |
-          $Bytes = [Convert]::FromBase64String($env:PFX_BASE64)
-          $Pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
-          [IO.File]::WriteAllBytes($Pfx, $Bytes)
-          pwsh -File Tools/Sign-Installer.ps1 -PfxPath $Pfx -PfxPassword $env:PFX_PASSWORD
 
-      # Attach the Setup.exe to the GitHub Release for this tag,
-      # so the in-app "Download now" button gets a direct file.
+      # ------------------------------------------------------
+      # 10. Attach installer to GitHub Release
+      #
+      # Only runs for v* tags.
+      # ------------------------------------------------------
       - name: Attach installer to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
