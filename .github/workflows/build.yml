@@ -33,7 +33,7 @@ jobs:
 
       - name: Set up Inno Setup
         shell: cmd
-        run: choco install innosetup --no-progress
+        run: choco install innosetup -y --no-progress
                    
       - name: GUI self-test (Windows PowerShell)
         shell: powershell
