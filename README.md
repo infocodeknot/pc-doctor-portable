@@ -1,7 +1,5 @@
 <div align="center">
 
-[![Build Status](https://github.com/infocodeknot/pc-doctor-portable/actions/workflows/build.yml/badge.svg)](https://github.com/infocodeknot/pc-doctor-portable/actions)
-
 # 🛠️ PC Doctor Portable
 
 ### Windows Maintenance & Repair Tool
@@ -12,7 +10,7 @@
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-5391FE.svg)
 ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4.svg)
 ![Version](https://img.shields.io/badge/Version-1.2.0-green.svg)
-![Tests](https://img.shields.io/badge/Tests-47%2F47-passing-brightgreen.svg)
+[![Build Status](https://github.com/infocodeknot/pc-doctor-portable/actions/workflows/build.yml/badge.svg)](https://github.com/infocodeknot/pc-doctor-portable/actions)
 
 <br>
 
