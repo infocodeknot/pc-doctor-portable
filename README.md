@@ -1,5 +1,7 @@
 <div align="center">
 
+[![Build Status](https://github.com/infocodeknot/pc-doctor-portable/actions/workflows/build.yml/badge.svg)](https://github.com/infocodeknot/pc-doctor-portable/actions)
+
 # 🛠️ PC Doctor Portable
 
 ### Windows Maintenance & Repair Tool
