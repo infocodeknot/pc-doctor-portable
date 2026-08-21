@@ -5,15 +5,16 @@
 # .github/workflows/build.yml
 #
 # On every v* tag push:
-#   1. Runs GUI self-test
-#   2. Checks all PowerShell scripts for syntax errors
-#   3. Generates app icon if required
-#   4. Installs / locates Inno Setup
-#   5. Builds:
+#   1. Runs Pester test suite
+#   2. Runs GUI self-test
+#   3. Checks all PowerShell scripts for syntax errors
+#   4. Generates app icon if required
+#   5. Installs / locates Inno Setup
+#   6. Builds:
 #        Installer/Output/PCDoctorPortable-Setup-<ver>.exe
-#   6. Optionally code-signs the installer
-#   7. Uploads installer as a GitHub Actions artifact
-#   8. Attaches installer to the GitHub Release for that tag
+#   7. Optionally code-signs the installer
+#   8. Uploads installer as a GitHub Actions artifact
+#   9. Attaches installer to the GitHub Release for that tag
 #
 # Manual workflow_dispatch:
 #   Runs the build/tests but does NOT create a Release,
@@ -79,8 +80,12 @@ jobs:
           Write-Host "Searching for ISCC.exe..."
 
           $Candidates = @(
-              "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-              "C:\Program Files\Inno Setup 6\ISCC.exe"
+              "$env:LOCALAPPDATA\Programs\Inno Setup 7\ISCC.exe",
+              "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+              "$env:ProgramFiles(x86)\Inno Setup 7\ISCC.exe",
+              "$env:ProgramFiles\Inno Setup 7\ISCC.exe",
+              "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe",
+              "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
           )
 
           $ISCC = $null
@@ -96,7 +101,7 @@ jobs:
           # somewhere else.
           if (-not $ISCC) {
               $ISCC = Get-ChildItem `
-                  -Path "C:\Program Files", "C:\Program Files (x86)" `
+                  -Path "$env:ProgramFiles", "$env:ProgramFiles(x86)" `
                   -Filter "ISCC.exe" `
                   -File `
                   -Recurse `
@@ -108,23 +113,6 @@ jobs:
               Write-Host ""
               Write-Host "ERROR: Inno Setup was installed but ISCC.exe was not found."
               Write-Host ""
-
-              Write-Host "Possible Inno Setup directories:"
-
-              Get-ChildItem `
-                  "C:\Program Files (x86)" `
-                  -Directory `
-                  -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -like "*Inno*" } |
-                  Select-Object FullName
-
-              Get-ChildItem `
-                  "C:\Program Files" `
-                  -Directory `
-                  -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -like "*Inno*" } |
-                  Select-Object FullName
-
               throw "Inno Setup / ISCC.exe could not be located."
           }
 
@@ -157,7 +145,33 @@ jobs:
 
 
       # ------------------------------------------------------
-      # 3. GUI self-test
+      # 3. Run Pester tests (all 47 tests)
+      # ------------------------------------------------------
+      - name: Run Pester tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          # Install Pester if not present (v5 recommended)
+          $Pester = Get-Module -ListAvailable Pester |
+              Sort-Object Version -Descending |
+              Select-Object -First 1
+
+          if (-not $Pester -or $Pester.Version.Major -lt 5) {
+              Write-Host "Installing Pester 5.x..."
+              Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+
+          Write-Host ""
+          pwsh -File Tools/Run-Tests.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "Pester tests failed with exit code $LASTEXITCODE."
+          }
+
+
+      # ------------------------------------------------------
+      # 4. GUI self-test (Windows PowerShell, headless)
       # ------------------------------------------------------
       - name: GUI self-test (Windows PowerShell)
         shell: powershell
@@ -170,7 +184,7 @@ jobs:
 
 
       # ------------------------------------------------------
-      # 4. Parse all PowerShell scripts
+      # 5. Parse all PowerShell scripts
       # ------------------------------------------------------
       - name: Parse all PowerShell scripts
         shell: pwsh
@@ -208,7 +222,7 @@ jobs:
 
 
       # ------------------------------------------------------
-      # 5. Generate application icon if missing
+      # 6. Generate application icon if missing
       # ------------------------------------------------------
       - name: Generate app icon (if missing)
         shell: pwsh
@@ -221,7 +235,7 @@ jobs:
 
 
       # ------------------------------------------------------
-      # 6. Build installer
+      # 7. Build installer
       # ------------------------------------------------------
       - name: Build installer
         shell: pwsh
@@ -236,7 +250,7 @@ jobs:
 
 
       # ------------------------------------------------------
-      # 7. Verify installer output
+      # 8. Verify installer output
       # ------------------------------------------------------
       - name: Verify installer output
         shell: pwsh
@@ -262,7 +276,7 @@ jobs:
 
 
       # ------------------------------------------------------
-      # 8. Optional code signing
+      # 9. Optional code signing
       #
       # GitHub Secrets:
       #
@@ -312,7 +326,7 @@ jobs:
 
 
       # ------------------------------------------------------
-      # 9. Upload final installer artifact
+      # 10. Upload final installer artifact
       #
       # This is AFTER signing, so the uploaded artifact is
       # the same final installer that gets published.
@@ -326,7 +340,7 @@ jobs:
 
 
       # ------------------------------------------------------
-      # 10. Attach installer to GitHub Release
+      # 11. Attach installer to GitHub Release
       #
       # Only runs for v* tags.
       # ------------------------------------------------------

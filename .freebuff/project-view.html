@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PC Doctor Portable — Project Explorer</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --yellow: #d29922; --red: #f85149;
+    --purple: #bc8cff; --pink: #f778ba;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height:1.6; }
+  .container { max-width:1100px; margin:0 auto; padding:2rem 1.5rem; }
+
+  /* Header */
+  .hero { text-align:center; padding:3rem 0 2rem; border-bottom:1px solid var(--border); margin-bottom:2rem; }
+  .hero h1 { font-size:2.4rem; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero .subtitle { color:var(--muted); font-size:1.1rem; margin-top:.5rem; }
+  .badges { display:flex; gap:.6rem; justify-content:center; margin-top:1rem; flex-wrap:wrap; }
+  .badge { display:inline-flex; align-items:center; gap:.3rem; padding:.25rem .65rem; border-radius:1rem; font-size:.78rem; font-weight:600; border:1px solid var(--border); background:var(--surface); }
+  .badge.green { color:var(--green); } .badge.blue { color:var(--accent); }
+  .badge.yellow { color:var(--yellow); } .badge.purple { color:var(--purple); }
+
+  /* Stats */
+  .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:1rem; margin-bottom:2rem; }
+  .stat { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.2rem; text-align:center; }
+  .stat .num { font-size:1.8rem; font-weight:700; color:var(--accent); }
+  .stat .label { font-size:.82rem; color:var(--muted); margin-top:.2rem; }
+
+  /* Sections */
+  section { margin-bottom:2.5rem; }
+  section h2 { font-size:1.3rem; margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; color:var(--text); }
+  section h2 span { font-size:1.4rem; }
+
+  /* Modules grid */
+  .modules-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap:.75rem; }
+  .module { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:.9rem 1rem; display:flex; align-items:flex-start; gap:.6rem; transition: border-color .2s; }
+  .module:hover { border-color:var(--accent); }
+  .module .icon { font-size:1.3rem; flex-shrink:0; margin-top:.1rem; }
+  .module .info h3 { font-size:.92rem; font-weight:600; }
+  .module .info p { font-size:.78rem; color:var(--muted); }
+
+  /* File tree */
+  .tree { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.2rem 1.5rem; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size:.85rem; line-height:1.8; overflow-x:auto; }
+  .tree .dir { color:var(--accent); } .tree .file { color:var(--text); } .tree .desc { color:var(--muted); font-style:italic; }
+
+  /* Config */
+  .config-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap:1rem; }
+  .config-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1rem 1.2rem; }
+  .config-card h3 { font-size:.9rem; color:var(--accent); margin-bottom:.5rem; }
+  .config-card ul { list-style:none; font-size:.82rem; }
+  .config-card li { padding:.2rem 0; color:var(--muted); }
+  .config-card li::before { content:'✓ '; color:var(--green); font-weight:700; }
+  .config-card li.off::before { content:'✗ '; color:var(--red); }
+
+  /* Tabs */
+  .tabs { display:flex; gap:0; margin-bottom:1.5rem; border-bottom:1px solid var(--border); }
+  .tab { padding:.6rem 1.2rem; cursor:pointer; font-size:.9rem; color:var(--muted); border-bottom:2px solid transparent; transition: all .2s; }
+  .tab:hover { color:var(--text); } .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab-content { display:none; } .tab-content.active { display:block; }
+
+  /* Source code preview */
+  .source { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1.2rem; overflow-x:auto; }
+  .source pre { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size:.8rem; line-height:1.7; color:var(--muted); white-space:pre-wrap; }
+  .source .kw { color:var(--purple); } .source .fn { color:var(--accent); } .source .str { color:var(--green); } .source .cm { color:#6e7681; font-style:italic; }
+
+  /* Footer */
+  footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); color:var(--muted); font-size:.82rem; }
+  footer a { color:var(--accent); text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>🛠️ PC Doctor Portable</h1>
+    <div class="subtitle">Windows Maintenance &amp; Repair Tool · v1.2 · Code Knot Technology</div>
+    <div class="badges">
+      <span class="badge purple">PowerShell 5.1+</span>
+      <span class="badge blue">Windows 10/11</span>
+      <span class="badge green">MIT License</span>
+      <span class="badge yellow">47 Tests</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat"><div class="num">45+</div><div class="label">Files</div></div>
+    <div class="stat"><div class="num">8,436</div><div class="label">Lines Added</div></div>
+    <div class="stat"><div class="num">19</div><div class="label">Modules</div></div>
+    <div class="stat"><div class="num">3,050</div><div class="label">GUI Lines</div></div>
+    <div class="stat"><div class="num">2</div><div class="label">Languages</div></div>
+    <div class="stat"><div class="num">2.1 MB</div><div class="label">Installer</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="modules">Modules</div>
+    <div class="tab" data-tab="files">File Tree</div>
+    <div class="tab" data-tab="config">Config</div>
+    <div class="tab" data-tab="source">Source</div>
+  </div>
+
+  <!-- Modules Tab -->
+  <div class="tab-content active" id="modules">
+    <section>
+      <h2><span>🔧</span> 19 Maintenance Modules</h2>
+      <div class="modules-grid">
+        <div class="module"><div class="icon">🌐</div><div class="info"><h3>Internet Check</h3><p>ICMP + DNS + HTTPS connectivity verification</p></div></div>
+        <div class="module"><div class="icon">🔄</div><div class="info"><h3>Network Repair</h3><p>DNS flush, Winsock reset, TCP/IP reset</p></div></div>
+        <div class="module"><div class="icon">🪟</div><div class="info"><h3>Windows Update</h3><p>Check &amp; install updates via COM API</p></div></div>
+        <div class="module"><div class="icon">🖥️</div><div class="info"><h3>Driver Updates</h3><p>Update drivers via Windows Update pipeline</p></div></div>
+        <div class="module"><div class="icon">📦</div><div class="info"><h3>Software Updates</h3><p>Update installed apps via Winget</p></div></div>
+        <div class="module"><div class="icon">🏪</div><div class="info"><h3>Microsoft Store</h3><p>Update Store apps via Winget (msstore)</p></div></div>
+        <div class="module"><div class="icon">🔧</div><div class="info"><h3>Windows Repair</h3><p>DISM image repair + SFC system file check</p></div></div>
+        <div class="module"><div class="icon">🧹</div><div class="info"><h3>Temp Cleanup</h3><p>Temp files, prefetch, crash dumps</p></div></div>
+        <div class="module"><div class="icon">🍪</div><div class="info"><h3>Browser Cleanup</h3><p>Clear cache &amp; cookies (Chrome, Edge, Firefox)</p></div></div>
+        <div class="module"><div class="icon">💾</div><div class="info"><h3>Disk Cleanup</h3><p>Runs Windows Disk Cleanup (cleanmgr)</p></div></div>
+        <div class="module"><div class="icon">⚡</div><div class="info"><h3>Optimization</h3><p>SSD ReTrim, Explorer restart, thumbnail cache</p></div></div>
+        <div class="module"><div class="icon">💾</div><div class="info"><h3>Restore Point</h3><p>Creates system restore point</p></div></div>
+        <div class="module"><div class="icon">📊</div><div class="info"><h3>System Verification</h3><p>Checks system health based on results</p></div></div>
+        <div class="module"><div class="icon">📋</div><div class="info"><h3>Auto Report</h3><p>Generates detailed system report</p></div></div>
+        <div class="module"><div class="icon">🔄</div><div class="info"><h3>Restart Manager</h3><p>Handles restart with auto-restart option</p></div></div>
+        <div class="module"><div class="icon">📅</div><div class="info"><h3>Task Scheduler</h3><p>Weekly auto-run via Windows Task Scheduler</p></div></div>
+        <div class="module"><div class="icon">🔔</div><div class="info"><h3>Toast Notifications</h3><p>Background run completion alerts</p></div></div>
+        <div class="module"><div class="icon">📜</div><div class="info"><h3>Run History</h3><p>Browse past logs and reports</p></div></div>
+        <div class="module"><div class="icon">💬</div><div class="info"><h3>Feedback Dialog</h3><p>Report bugs with system diagnostics</p></div></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- File Tree Tab -->
+  <div class="tab-content" id="files">
+    <section>
+      <h2><span>📁</span> Project Structure</h2>
+      <div class="tree">
+<span class="dir">PCDoctorPortable/</span>
+├── <span class="file">Main.ps1</span>                    <span class="desc"># Entry point</span>
+├── <span class="file">Config.json</span>                 <span class="desc"># All settings &amp; toggles</span>
+├── <span class="file">Run.bat</span>                     <span class="desc"># Console launcher</span>
+├── <span class="file">README.md</span>                   <span class="desc"># Documentation</span>
+├── <span class="file">LICENSE.txt</span>                 <span class="desc"># MIT License</span>
+├── <span class="dir">App/</span>
+│   ├── <span class="file">PCDoctor-GUI.ps1</span>        <span class="desc"># WPF GUI (3,050 lines)</span>
+│   ├── <span class="file">strings.json</span>            <span class="desc"># EN + HI translations</span>
+│   └── <span class="file">Register-TaskElevated.ps1</span>
+├── <span class="dir">Modules/</span>
+│   ├── <span class="file">Banner.ps1</span>              <span class="desc"># Console banners</span>
+│   ├── <span class="file">Menu.ps1</span>                <span class="desc"># Interactive menu</span>
+│   ├── <span class="file">UI.ps1</span>                  <span class="desc"># Colors, progress bars</span>
+│   ├── <span class="file">Common.ps1</span>              <span class="desc"># Shared helpers</span>
+│   ├── <span class="file">Cleanup.ps1</span>             <span class="desc"># Temp/cache/cookie cleanup</span>
+│   ├── <span class="file">Repair.ps1</span>              <span class="desc"># DISM + SFC</span>
+│   ├── <span class="file">Optimize.ps1</span>            <span class="desc"># SSD, Explorer, thumbnails</span>
+│   ├── <span class="file">WindowsUpdate.ps1</span>       <span class="desc"># Windows Update</span>
+│   ├── <span class="file">Drivers.ps1</span>             <span class="desc"># Driver updates</span>
+│   ├── <span class="file">Winget.ps1</span>              <span class="desc"># Software updates</span>
+│   ├── <span class="file">Store.ps1</span>               <span class="desc"># Microsoft Store</span>
+│   ├── <span class="file">TaskScheduler.ps1</span>       <span class="desc"># Task Scheduler + toast</span>
+│   └── <span class="desc">... (19 modules total)</span>
+├── <span class="dir">Tests/</span>
+│   ├── <span class="file">Config.Tests.ps1</span>        <span class="desc"># Config validation</span>
+│   ├── <span class="file">Core.Tests.ps1</span>          <span class="desc"># Function tests</span>
+│   ├── <span class="file">Cleanup.Tests.ps1</span>       <span class="desc"># Cleanup tests</span>
+│   ├── <span class="file">Modules.Tests.ps1</span>       <span class="desc"># Module contract tests</span>
+│   └── <span class="file">Update.Tests.ps1</span>        <span class="desc"># Version parser tests</span>
+├── <span class="dir">Tools/</span>
+│   ├── <span class="file">Build-Installer.ps1</span>     <span class="desc"># Inno Setup builder</span>
+│   ├── <span class="file">Run-Tests.ps1</span>           <span class="desc"># CI test runner</span>
+│   └── <span class="file">Sign-Installer.ps1</span>      <span class="desc"># Code signing</span>
+├── <span class="dir">Assets/</span>  <span class="desc">PCDoctor.ico</span>
+├── <span class="dir">Installer/</span>  <span class="desc">PCDoctorPortable.iss</span>
+├── <span class="dir">.github/workflows/</span>  <span class="desc">build.yml</span>
+├── <span class="dir">Logs/</span>
+└── <span class="dir">Reports/</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Config Tab -->
+  <div class="tab-content" id="config">
+    <section>
+      <h2><span>⚙️</span> Configuration (Config.json)</h2>
+      <div class="config-grid">
+        <div class="config-card">
+          <h3>General</h3>
+          <ul>
+            <li>ToolkitName: PC Doctor Portable</li>
+            <li>Version: 1.2</li>
+            <li>Language: EN</li>
+            <li>ShowToast: true</li>
+            <li>ConsoleStyle: Classic</li>
+            <li>Theme: System</li>
+          </ul>
+        </div>
+        <div class="config-card">
+          <h3>Cleanup</h3>
+          <ul>
+            <li>CleanTemp</li>
+            <li>RunDiskCleanup</li>
+            <li>CleanCookies</li>
+            <li>CleanBrowserCache</li>
+            <li>CleanPrefetch</li>
+            <li>CleanCrashDumps</li>
+            <li class="off">CleanWindowsUpdateCache (off)</li>
+          </ul>
+        </div>
+        <div class="config-card">
+          <h3>Repair</h3>
+          <ul>
+            <li>RunDISM</li>
+            <li>RunSFC</li>
+          </ul>
+        </div>
+        <div class="config-card">
+          <h3>Optimization</h3>
+          <ul>
+            <li>OptimizeDrives</li>
+            <li>RestartExplorer</li>
+            <li>ClearThumbnailCache</li>
+          </ul>
+        </div>
+        <div class="config-card">
+          <h3>Online Modules</h3>
+          <ul>
+            <li>WindowsUpdate: Enabled</li>
+            <li>Drivers: Enabled</li>
+            <li>Winget: Enabled</li>
+            <li>Store: Enabled</li>
+          </ul>
+        </div>
+        <div class="config-card">
+          <h3>Retention</h3>
+          <ul>
+            <li>KeepLogs: 30 days</li>
+            <li>KeepReports: 20 days</li>
+            <li>KeepBackups: 5 days</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Source Tab -->
+  <div class="tab-content" id="source">
+    <section>
+      <h2><span>💻</span> Source Preview — Main.ps1 (Entry Point)</h2>
+      <div class="source"><pre><span class="cm"># PC Doctor Portable — Main Entry Point</span>
+<span class="cm"># Version 1.2 | Code Knot Technology</span>
+
+<span class="kw">param</span>(
+    [switch]$AutoMode,
+    [switch]$InteractiveMode,
+    [switch]$SelfTest,
+    [switch]$RenderShot,
+    [string]$ShotPath = <span class="str">"RenderShot.png"</span>
+)
+
+<span class="cm"># Load configuration</span>
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$configPath = Join-Path $scriptDir <span class="str">"Config.json"</span>
+
+<span class="kw">if</span> (Test-Path $configPath) {
+    $script:Config = Get-Content $configPath -Raw | ConvertFrom-Json
+    Write-Host <span class="str">"[OK] Configuration loaded"</span> -ForegroundColor Green
+} <span class="kw">else</span> {
+    Write-Host <span class="str">"[WARN] Config.json not found"</span> -ForegroundColor Yellow
+}
+
+<span class="cm"># Import all modules</span>
+$moduleDir = Join-Path $scriptDir <span class="str">"Modules"</span>
+Get-ChildItem -Path $moduleDir -Filter <span class="str">"*.ps1"</span> | ForEach-Object {
+    . $_.FullName
+}
+
+<span class="cm"># Launch GUI or Console based on mode</span>
+<span class="kw">if</span> ($SelfTest) {
+    <span class="cm"># Run built-in GUI self-test</span>
+    & (Join-Path $scriptDir <span class="str">"App\PCDoctor-GUI.ps1"</span>) -SelfTest
+} <span class="kw">elseif</span> (-not $AutoMode -and -not $InteractiveMode) {
+    <span class="cm"># Default: show menu</span>
+    Show-Menu
+} <span class="kw">else</span> {
+    <span class="fn">Invoke-AllModules</span> -AutoMode:$AutoMode
+}</pre></div>
+    </section>
+    <section>
+      <h2><span>🚀</span> Quick Start Commands</h2>
+      <div class="source"><pre><span class="cm"># Run GUI</span>
+powershell -ExecutionPolicy Bypass -File <span class="str">"App\PCDoctor-GUI.ps1"</span>
+
+<span class="cm"># Run Console</span>
+.\Run.bat
+
+<span class="cm"># Run all 47 Pester tests</span>
+pwsh -File Tools\Run-Tests.ps1
+
+<span class="cm"># Run GUI self-test (no window)</span>
+powershell -File App\PCDoctor-GUI.ps1 -SelfTest
+
+<span class="cm"># Build installer (requires Inno Setup)</span>
+pwsh -File Tools\Build-Installer.ps1</pre></div>
+    </section>
+  </div>
+
+  <footer>
+    <p>PC Doctor Portable v1.2 · <a href="https://github.com/infocodeknot/pc-doctor-portable">GitHub</a> · MIT License · Made by Code Knot Technology</p>
+    <p style="margin-top:.3rem;">Viewing from worktree — project explorer generated for live preview</p>
+  </footer>
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
